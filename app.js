@@ -3,10 +3,10 @@
 // https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-nodejs
 
 const args = require('minimist')(process.argv.slice(2)); // Get arguments by name rather than by index
+const axios = require('axios')
 const { BlobServiceClient } = require('@azure/storage-blob');
-const chalk = require('chalk'); // Add color to the console
-const http = require('http');
 const https = require('https');
+const chalk = require('chalk'); // Add color to the console
 const uuidv1 = require('uuid/v1');
 
 const main = async () => {
@@ -15,13 +15,21 @@ const main = async () => {
     const blobServiceClient = await BlobServiceClient.fromConnectionString(azureStorageConnectionString);
     const containerClient = await blobServiceClient.getContainerClient('kpi');
     // Run these in parallel (no await)
-    const applications = await getApplications(containerClient);
-    const metrics = await getMetrics(containerClient);
-    const queries = await getQueries(containerClient);
-    processMetrics(applications, metrics, queries);
+    const promisses = [];
+    promisses.push(getApplications(containerClient));
+    promisses.push(getMetrics(containerClient));
+    promisses.push(getQueries(containerClient));
+    return Promise.all(promisses)
+        .then((results) => {
+            const applications = results[0];
+            const metrics = results[1];
+            const queries = results[2];
+            return processMetrics(applications, containerClient, metrics, queries);
+        })
+        .catch(handleError);
 }
 
-const addMonth = (applications, app, date, queries) => {
+const addMonth = async (applications, app, date, queries) => {
     // Get data for the full month preceeding the date passed in
     // ex: 5/15/2020 passed means get the full month od April (May data collection is not completed yet)
     const fromDate = new Date(date.getFullYear(), date.getMonth() - 1, 1);
@@ -31,14 +39,16 @@ const addMonth = (applications, app, date, queries) => {
         date: `${toDate.getMonth() + 1}/1/${toDate.getFullYear()}`
     };
     app.months.push(month);
-    const observableArray = [];
+    const requestArray = [];
     const connection = getKustoConnection(applications, app.name);
-    queries.forEach(query => observableArray.push(getKustoResult(connection, fromDate, toDate, query.query)));
-    forkJoin(observableArray).subscribe(results => {
-        for (let i = 0; i < queries.length; i++) {
-            month[queries[i].name] = Number(results[i]);
-        }
-    }, err => console.error(err));
+    queries.forEach(query => requestArray.push(getKustoResult(connection, fromDate, toDate, query.query)));
+    return Promise.all(requestArray)
+        .then((responses) => {
+            for (let i = 0; i < queries.length; i++) {
+                month[queries[i].name] = Number(responses[i]);
+            }
+        })
+        .catch(handleError);
 }
 
 const createNewApp = (app, metrics) => {
@@ -86,19 +96,26 @@ const getKustoConnection = (applications, name) => {
     return connection;
 }
 
-const getKustoResult = (kustoConnection, fromDate, toDate, query) => {
+const getKustoResult = async (kustoConnection, fromDate, toDate, query) => {
     // Query Azure App Insights
     query = query
         // January is 0 not 1
         .replace('<FromDateGoesHere>', `${fromDate.getMonth() + 1}/${fromDate.getDate()}/${fromDate.getFullYear()}`)
         .replace('<ToDateGoesHere>', `${toDate.getMonth() + 1}/${fromDate.getDate()}/${toDate.getFullYear()}`)
         .replace('<RoleNameGoesHere>', kustoConnection.roleName);
-    return http.post(kustoConnection.url, { query }, kustoConnection.options).pipe(
-        map((response) => {
-            return response.tables[0].rows[0]; // Only one row will come back
+    return axios.request({
+        data: { query },            
+        headers: kustoConnection.options.headers,
+        httpsAgent: new https.Agent({
+            keepAlive: true,
+            rejectUnauthorized: false // (NOTE: this will disable client verification)
         }),
-        catchError(handleError)
-    );
+        method: 'post',
+        url: kustoConnection.url
+    }).then((response) => {
+        return response.data.tables[0].rows[0]; // Only one row will come back
+    })
+    .catch(handleError);
 }
 
 const getQueries = async (containerClient) => {
@@ -123,7 +140,8 @@ const handleError = (error) => {
     return observableThrowError(error || 'Server error');
 }
 
-const processMetrics = (applications, metrics, queries) => {
+const processMetrics = async (applications, containerClient, metrics, queries) => {
+    console.log('Processing metrics');
     // Determine the last month of data collected
     const today = new Date();
     const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -138,38 +156,41 @@ const processMetrics = (applications, metrics, queries) => {
     );
     // Determine if any new applications were added to the environment
     let metricsDirty = false;
+    const promisses = [];
     applications.forEach(app => {
         // Get matching app from state
         let metricsApp = metrics.applications.find(a => a.name === app.name);
         if (metricsApp === undefined) {
             metricsApp = createNewApp(app, metrics);
             // Try and get last 2 months of data
-            addMonth(applications, metricsApp, new Date(mostRecentDate.getFullYear(), mostRecentDate.getMonth() - 1, mostRecentDate.getDay()), queries);
-            addMonth(applications, metricsApp, mostRecentDate, queries);
             metricsDirty = true;
+            promisses.push(addMonth(applications, metricsApp, new Date(mostRecentDate.getFullYear(), mostRecentDate.getMonth() - 1, mostRecentDate.getDay()), queries));
+            promisses.push(addMonth(applications, metricsApp, mostRecentDate, queries));
         }
         // Determine if it is time to get the next month's of data
         // Date will be first of month when full month was collected (ex: 1/1/2020 means all of January)
         if (true) {
-        // if (mostRecentDate < firstDayOfCurrentMonth) {
-            addMonth(applications, metricsApp, firstDayOfCurrentMonth, queries);
+            // if (mostRecentDate < firstDayOfCurrentMonth) {
             metricsDirty = true;
+            promisses.push(addMonth(applications, metricsApp, firstDayOfCurrentMonth, queries));
         }
     });
-    if(metricsDirty) {
-        saveMetrics(metrics);
-    }
+    await Promise.all(promisses)
+        .then((results) => {
+            if(metricsDirty) {
+                return saveMetrics(containerClient, metrics);
+            } else {
+                console.log('Metrics are already up-to-date.  No updates needed')
+            }
+        })
+        .catch(handleError);
 }
 
-const saveMetrics = (metrics) => {
-    /////////////////////////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////////////////////////
-    // Not fully implemented
-    /////////////////////////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////////////////////////
-    metricsString = JSON.stringify(metrics);
+const saveMetrics = async (containerClient, metrics) => {
     console.log("Saving updated metrics");
-    console.log(metricsString);
+    const metricsString = JSON.stringify(metrics);
+    const blockBlobClient = containerClient.getBlockBlobClient("metrics2.json");
+    return blockBlobClient.upload(metricsString, metricsString.length);
 }
 
 const streamToString = async (readableStream) => {
