@@ -1,0 +1,28 @@
+{
+  "name": "pii-cleanup",
+  "version": "1.0.0",
+  "description": "Dababase cleanup routine to replace PII data with fake data",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http/github/PaulGilchrist"
+  },
+  "keywords": [
+    "pii",
+    "fake"
+  ],
+  "author": "Paul Gilchrist",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/storage-blob": "^12.0.0",
+    "@types/dotenv": "^4.0.3",
+    "chalk": "^4.0.0",
+    "dotenv": "^6.0.0",
+    "faker": "^4.1.0",
+    "minimist": "^1.2.5",
+    "mssql": "^6.2.0"
+  }
+}
