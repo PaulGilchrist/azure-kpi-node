@@ -45,7 +45,10 @@ const addMonth = async (applications, app, date, queries) => {
     return Promise.all(requestArray)
         .then((responses) => {
             for (let i = 0; i < queries.length; i++) {
-                month[queries[i].name] = Number(responses[i]);
+                if(responses[i] && Number(responses[i])) { // Do not write properties that are null, undefined, or NaN
+                    console.log(`${app.name} - ${queries[i].displayName} = ${Number(responses[i])}`);
+                    month[queries[i].name] = Number(responses[i]);
+                }
             }
         })
         .catch(handleError);
@@ -141,7 +144,7 @@ const handleError = (error) => {
 }
 
 const processMetrics = async (applications, containerClient, metrics, queries) => {
-    console.log('Processing metrics');
+    console.log(`Processing ${applications.length + queries.length} metrics`);
     // Determine the last month of data collected
     const today = new Date();
     const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -169,8 +172,7 @@ const processMetrics = async (applications, containerClient, metrics, queries) =
         }
         // Determine if it is time to get the next month's of data
         // Date will be first of month when full month was collected (ex: 1/1/2020 means all of January)
-        if (true) {
-            // if (mostRecentDate < firstDayOfCurrentMonth) {
+        if (mostRecentDate < firstDayOfCurrentMonth) {
             metricsDirty = true;
             promisses.push(addMonth(applications, metricsApp, firstDayOfCurrentMonth, queries));
         }
@@ -189,7 +191,7 @@ const processMetrics = async (applications, containerClient, metrics, queries) =
 const saveMetrics = async (containerClient, metrics) => {
     console.log("Saving updated metrics");
     const metricsString = JSON.stringify(metrics);
-    const blockBlobClient = containerClient.getBlockBlobClient("metrics2.json");
+    const blockBlobClient = containerClient.getBlockBlobClient("metrics.json");
     return blockBlobClient.upload(metricsString, metricsString.length);
 }
 
