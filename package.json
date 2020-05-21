@@ -1,28 +1,29 @@
 {
-  "name": "pii-cleanup",
-  "version": "1.0.0",
-  "description": "Dababase cleanup routine to replace PII data with fake data",
-  "main": "app.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "http/github/PaulGilchrist"
-  },
-  "keywords": [
-    "pii",
-    "fake"
-  ],
-  "author": "Paul Gilchrist",
-  "license": "ISC",
-  "dependencies": {
-    "@azure/storage-blob": "^12.0.0",
-    "@types/dotenv": "^4.0.3",
-    "chalk": "^4.0.0",
-    "dotenv": "^6.0.0",
-    "faker": "^4.1.0",
-    "minimist": "^1.2.5",
-    "mssql": "^6.2.0"
-  }
+    "author": "Paul Gilchrist",
+    "dependencies": {
+        "@azure/storage-blob": "^12.0.0",
+        "@types/dotenv": "^4.0.3",
+        "axios": "^0.19.2",
+        "chalk": "^4.0.0",
+        "dotenv": "^6.0.0",
+        "minimist": "^1.2.5"
+    },
+    "description": "Azure App Insights KPI Collection Automation",
+    "keywords": [
+        "Application Insights",
+        "Azure",
+        "KPI",
+        "Kusto"
+    ],
+    "license": "ISC",
+    "main": "app.js",
+    "name": "azure-kpi-node",
+    "version": "1.0.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/PaulGilchrist/azure-kpi-node"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    }
 }

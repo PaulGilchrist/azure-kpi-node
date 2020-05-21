@@ -25,8 +25,7 @@ const main = async () => {
             const metrics = results[1];
             const queries = results[2];
             return processMetrics(applications, containerClient, metrics, queries);
-        })
-        .catch(handleError);
+        });
 }
 
 const addMonth = async (applications, app, date, queries) => {
@@ -50,8 +49,7 @@ const addMonth = async (applications, app, date, queries) => {
                     month[queries[i].name] = Number(responses[i]);
                 }
             }
-        })
-        .catch(handleError);
+        });
 }
 
 const createNewApp = (app, metrics) => {
@@ -117,8 +115,7 @@ const getKustoResult = async (kustoConnection, fromDate, toDate, query) => {
         url: kustoConnection.url
     }).then((response) => {
         return response.data.tables[0].rows[0]; // Only one row will come back
-    })
-    .catch(handleError);
+    });
 }
 
 const getQueries = async (containerClient) => {
@@ -135,12 +132,6 @@ const getMetrics = async (containerClient) => {
     const blockBlobClient = containerClient.getBlockBlobClient("metrics.json");
     const downloadBlockBlobResponse = await blockBlobClient.download(0); // Get blob content from position 0 to the end
     return JSON.parse(await streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
-}
-
-const handleError = (error) => {
-    // In the future, we may send the server to some remote logging infrastructure
-    console.error(error);
-    return observableThrowError(error || 'Server error');
 }
 
 const processMetrics = async (applications, containerClient, metrics, queries) => {
@@ -185,7 +176,6 @@ const processMetrics = async (applications, containerClient, metrics, queries) =
                 console.log('Metrics are already up-to-date.  No updates needed')
             }
         })
-        .catch(handleError);
 }
 
 const saveMetrics = async (containerClient, metrics) => {
@@ -209,4 +199,4 @@ const streamToString = async (readableStream) => {
     });
 }
 
-main().then(() => console.log('Done')).catch((ex) => console.log(ex.message));
+main().then(() => console.log('Done'));
