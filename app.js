@@ -7,6 +7,7 @@ const axios = require('axios')
 const { BlobServiceClient } = require('@azure/storage-blob');
 const https = require('https');
 const chalk = require('chalk'); // Add color to the console
+const utilities = require('pg-utilities');
 const uuidv1 = require('uuid/v1');
 
 const main = async () => {
@@ -70,7 +71,7 @@ const getApplications = async (containerClient) => {
     console.log('Getting applicaiton list from Azure Storage');
     const blockBlobClient = containerClient.getBlockBlobClient("applications.json");
     const downloadBlockBlobResponse = await blockBlobClient.download(0); // Get blob content from position 0 to the end
-    return JSON.parse(await streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
+    return JSON.parse(await utilities.streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
 }
 
 const getKustoConnection = (applications, name) => {
@@ -123,7 +124,7 @@ const getQueries = async (containerClient) => {
     console.log('Getting query list from Azure Storage');
     const blockBlobClient = containerClient.getBlockBlobClient("queries.json");
     const downloadBlockBlobResponse = await blockBlobClient.download(0); // Get blob content from position 0 to the end
-    return JSON.parse(await streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
+    return JSON.parse(await utilities.streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
 }
 
 const getMetrics = async (containerClient) => {
@@ -131,7 +132,7 @@ const getMetrics = async (containerClient) => {
     console.log('Getting metrics data from Azure Storage');
     const blockBlobClient = containerClient.getBlockBlobClient("metrics.json");
     const downloadBlockBlobResponse = await blockBlobClient.download(0); // Get blob content from position 0 to the end
-    return JSON.parse(await streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
+    return JSON.parse(await utilities.streamToString(downloadBlockBlobResponse.readableStreamBody)); // Browser would use blobBody rather than readableStreamBody
 }
 
 const processMetrics = async (applications, containerClient, metrics, queries) => {
@@ -183,20 +184,6 @@ const saveMetrics = async (containerClient, metrics) => {
     const metricsString = JSON.stringify(metrics);
     const blockBlobClient = containerClient.getBlockBlobClient("metrics.json");
     return blockBlobClient.upload(metricsString, metricsString.length);
-}
-
-const streamToString = async (readableStream) => {
-    // A helper function used to read a Node.js readable stream into a string
-    return new Promise((resolve, reject) => {
-        const chunks = [];
-        readableStream.on("data", (data) => {
-            chunks.push(data.toString());
-        });
-        readableStream.on("end", () => {
-            resolve(chunks.join(""));
-        });
-        readableStream.on("error", reject);
-    });
 }
 
 main().then(() => console.log('Done'));
