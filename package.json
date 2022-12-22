@@ -7,7 +7,7 @@
         "chalk": "^4.0.0",
         "dotenv": "^6.0.0",
         "minimist": "^1.2.5",
-        "pg-utilities": "^1.0.7"
+        "pg-utilities": "^1.0.8"
     },
     "description": "Azure App Insights KPI Collection Automation",
     "keywords": [
